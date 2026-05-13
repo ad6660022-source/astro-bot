@@ -18,7 +18,7 @@ async def init_db():
                 created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        for col in ("birth_date",):
+        for col in ("birth_date", "last_free_tarot"):
             try:
                 await db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
             except Exception:
@@ -94,6 +94,24 @@ async def set_zodiac(user_id: int, zodiac_sign: str):
         await db.execute(
             "UPDATE users SET zodiac_sign = ? WHERE user_id = ?",
             (zodiac_sign, user_id)
+        )
+        await db.commit()
+
+
+async def get_free_tarot_used(user_id: int, date: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT last_free_tarot FROM users WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    return bool(row and row[0] == date)
+
+
+async def mark_free_tarot_used(user_id: int, date: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET last_free_tarot = ? WHERE user_id = ?",
+            (date, user_id)
         )
         await db.commit()
 

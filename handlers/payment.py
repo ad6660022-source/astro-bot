@@ -70,10 +70,10 @@ async def successful_payment(message: Message, state: FSMContext):
 
     elif payload == "private_reading":
         from handlers.tarot import TarotState
-        await state.set_state(TarotState.waiting_for_private_situation)
+        await state.set_state(TarotState.waiting_for_private_situation_paid)
         await message.answer(
             "✅ <b>Оплачено!</b>\n\n"
             "🎴 Опиши свою ситуацию или задай вопрос.\n"
-            "Чем подробнее — тем точнее будет расклад:",
+            "Чем подробнее — тем точнее расклад:",
             parse_mode="HTML"
         )
