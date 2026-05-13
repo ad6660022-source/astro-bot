@@ -84,6 +84,35 @@ def cancel_kb(callback: str = "cancel_fsm") -> InlineKeyboardMarkup:
     ])
 
 
+ASTRO_TEMPLATES = {
+    1: ("🌕 Полнолуние", "🌕 <b>Сегодня полнолуние!</b>\n\nПолная Луна — самое мощное время для Таро. Карты открываются яснее, интуиция обострена до предела.\n\nСделай расклад прямо сейчас — первый сегодня <b>бесплатно</b> 🎴"),
+    2: ("🎁 Бесплатный расклад", "🎁 <b>Напоминание!</b>\n\nКаждый день у тебя есть <b>1 бесплатный приватный расклад</b>.\n\nЗадай картам свой вопрос — они всегда готовы ответить. Просто открой бота и нажми «Приватный расклад» 🔮"),
+    3: ("✨ Новый месяц", "✨ <b>Новый месяц — новая энергия!</b>\n\nЭто лучшее время чтобы узнать что ждёт тебя впереди.\n\nПолучи персональный гороскоп и расклад Таро — карты расскажут всё о предстоящем месяце 🌟"),
+    4: ("🃏 Карта дня", "🃏 <b>Карта дня — Звезда ⭐</b>\n\nЗвезда символизирует надежду, обновление и веру в лучшее. Сегодня важно доверять своей интуиции и не бояться мечтать.\n\nУзнай свой персональный расклад на сегодня — что карты говорят именно тебе 👇"),
+    5: ("📅 Таро на день", "📅 <b>Ты проверил расклад на сегодня?</b>\n\nКаждое утро — 3 персональные карты именно для тебя:\n🌅 Энергия дня  •  💡 Совет  •  🎯 Итог\n\nДоступно по подписке всего <b>75 ⭐ в месяц</b> (~136 руб) 🌙"),
+    6: ("☿ Меркурий ретро", "☿ <b>Осторожно — Меркурий ретроградный!</b>\n\nВ этот период важно быть внимательным в общении, договорах и решениях. Старое возвращается, связи рвутся.\n\nУзнай что карты говорят именно тебе в это непростое время 🎴"),
+}
+
+
+def broadcast_templates_kb() -> InlineKeyboardMarkup:
+    buttons = []
+    for num, (name, _) in ASTRO_TEMPLATES.items():
+        buttons.append([InlineKeyboardButton(
+            text=f"📝 {num}. {name}",
+            callback_data=f"admin_tpl_{num}"
+        )])
+    buttons.append([InlineKeyboardButton(text="✏️ Написать своё", callback_data="admin_broadcast_custom")])
+    buttons.append([InlineKeyboardButton(text="◀️ Меню", callback_data="admin_menu")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def template_confirm_kb(num: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Отправить всем", callback_data=f"admin_tpl_send_{num}")],
+        [InlineKeyboardButton(text="◀️ К шаблонам", callback_data="admin_broadcast")],
+    ])
+
+
 def admin_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📋 Открытые тикеты", callback_data="admin_open_tickets")],

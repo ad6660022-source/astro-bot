@@ -7,7 +7,10 @@ from datetime import datetime, timezone
 
 import database as db
 from config import ADMIN_IDS
-from keyboards.inline import admin_menu_kb, admin_tickets_kb, admin_ticket_kb
+from keyboards.inline import (
+    admin_menu_kb, admin_tickets_kb, admin_ticket_kb,
+    broadcast_templates_kb, template_confirm_kb, ASTRO_TEMPLATES
+)
 
 router = Router()
 
@@ -213,27 +216,50 @@ async def admin_balance(call: CallbackQuery):
 
 
 @router.callback_query(F.data == "admin_broadcast")
-async def admin_broadcast_start(call: CallbackQuery, state: FSMContext):
+async def admin_broadcast_menu(call: CallbackQuery, state: FSMContext):
     if not is_admin(call.from_user.id):
         return
-    await state.set_state(AdminStates.waiting_for_broadcast)
+    await state.clear()
+    user_ids = await db.get_all_user_ids()
     await call.message.edit_text(
-        "📤 <b>Рассылка</b>\n\n"
-        "Напиши текст сообщения для всех пользователей.\n"
-        "Поддерживается HTML-форматирование (<b>жирный</b>, <i>курсив</i>).",
-        parse_mode="HTML"
+        f"📤 <b>Рассылка</b>\n\n"
+        f"👥 Получателей: <b>{len(user_ids)}</b>\n\n"
+        f"Выбери шаблон или напиши своё сообщение:",
+        parse_mode="HTML",
+        reply_markup=broadcast_templates_kb()
     )
 
 
-@router.message(AdminStates.waiting_for_broadcast)
-async def admin_broadcast_send(message: Message, state: FSMContext, bot: Bot):
-    await state.clear()
-    text = message.text or ""
+@router.callback_query(F.data.startswith("admin_tpl_") & ~F.data.startswith("admin_tpl_send_"))
+async def admin_template_preview(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+    num = int(call.data.split("_")[-1])
+    if num not in ASTRO_TEMPLATES:
+        return
+    name, text = ASTRO_TEMPLATES[num]
+    await call.message.edit_text(
+        f"👁 <b>Превью — {name}</b>\n\n"
+        f"{'─' * 30}\n\n"
+        f"{text}\n\n"
+        f"{'─' * 30}",
+        parse_mode="HTML",
+        reply_markup=template_confirm_kb(num)
+    )
+
+
+@router.callback_query(F.data.startswith("admin_tpl_send_"))
+async def admin_template_send(call: CallbackQuery, bot: Bot):
+    if not is_admin(call.from_user.id):
+        return
+    num = int(call.data.split("_")[-1])
+    if num not in ASTRO_TEMPLATES:
+        return
+    _, text = ASTRO_TEMPLATES[num]
     user_ids = await db.get_all_user_ids()
 
-    status = await message.answer(f"📤 Отправляю {len(user_ids)} пользователям...")
+    status = await call.message.edit_text(f"📤 Отправляю {len(user_ids)} пользователям...")
     sent, failed = 0, 0
-
     for uid in user_ids:
         if uid in ADMIN_IDS:
             continue
@@ -247,5 +273,45 @@ async def admin_broadcast_send(message: Message, state: FSMContext, bot: Bot):
         f"✅ <b>Рассылка завершена</b>\n\n"
         f"📨 Отправлено: <b>{sent}</b>\n"
         f"❌ Не доставлено: <b>{failed}</b>",
+        parse_mode="HTML",
+        reply_markup=admin_menu_kb()
+    )
+
+
+@router.callback_query(F.data == "admin_broadcast_custom")
+async def admin_broadcast_custom(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    await state.set_state(AdminStates.waiting_for_broadcast)
+    await call.message.edit_text(
+        "✏️ <b>Своё сообщение</b>\n\n"
+        "Напиши текст рассылки.\n"
+        "Поддерживается HTML: <b>жирный</b>, <i>курсив</i>",
         parse_mode="HTML"
+    )
+
+
+@router.message(AdminStates.waiting_for_broadcast)
+async def admin_broadcast_send(message: Message, state: FSMContext, bot: Bot):
+    await state.clear()
+    text = message.text or ""
+    user_ids = await db.get_all_user_ids()
+
+    status = await message.answer(f"📤 Отправляю {len(user_ids)} пользователям...")
+    sent, failed = 0, 0
+    for uid in user_ids:
+        if uid in ADMIN_IDS:
+            continue
+        try:
+            await bot.send_message(uid, text, parse_mode="HTML")
+            sent += 1
+        except Exception:
+            failed += 1
+
+    await status.edit_text(
+        f"✅ <b>Рассылка завершена</b>\n\n"
+        f"📨 Отправлено: <b>{sent}</b>\n"
+        f"❌ Не доставлено: <b>{failed}</b>",
+        parse_mode="HTML",
+        reply_markup=admin_menu_kb()
     )
