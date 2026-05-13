@@ -59,7 +59,14 @@ def horoscope_confirm_kb(sign: str) -> InlineKeyboardMarkup:
 def subscribe_daily_tarot_kb(price: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"⭐ Подписка {price} звёзд / месяц", callback_data="pay_tarot_sub")],
-        [InlineKeyboardButton(text="🎴 Разовый расклад — 50 ⭐", callback_data="private_reading_start")],
+        [InlineKeyboardButton(text="🎁 Приватный расклад — первый бесплатно!", callback_data="private_reading_start")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_main")],
+    ])
+
+
+def private_reading_free_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎁 Использовать бесплатный расклад", callback_data="use_free_tarot")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="back_main")],
     ])
 
@@ -68,6 +75,12 @@ def pay_private_reading_kb(price: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"💳 Оплатить {price} ⭐", callback_data="pay_private_reading")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="back_main")],
+    ])
+
+
+def cancel_kb(callback: str = "cancel_fsm") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Отмена", callback_data=callback)]
     ])
 
 

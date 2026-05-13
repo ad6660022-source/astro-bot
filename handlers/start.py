@@ -73,6 +73,7 @@ async def back_main(call: CallbackQuery):
 
 @router.callback_query(F.data == "profile")
 async def show_profile(call: CallbackQuery):
+    from handlers.tarot import get_level, get_next_level_info
     user_data = await db.get_user(call.from_user.id)
     if not user_data:
         await call.answer("Профиль не найден", show_alert=True)
@@ -100,9 +101,15 @@ async def show_profile(call: CallbackQuery):
     else:
         sub_status = "❌ Не оформлена"
 
+    readings = user_data.get("readings_count") or 0
+    level = get_level(readings)
+    next_level = get_next_level_info(readings)
+
     await call.message.edit_text(
         f"👤 <b>Профиль</b>\n\n"
-        f"Имя: {call.from_user.full_name}\n"
+        f"✨ Уровень: <b>{level}</b>\n"
+        f"🃏 Раскладов сделано: <b>{readings}</b>\n"
+        f"📈 <i>{next_level}</i>\n\n"
         f"Знак зодиака: {zodiac_str}\n"
         f"Дата рождения: {birth_date}\n"
         f"Подписка «Таро на день»: {sub_status}",

@@ -23,6 +23,10 @@ async def init_db():
                 await db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
             except Exception:
                 pass
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN readings_count INTEGER DEFAULT 0")
+        except Exception:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS horoscopes (
                 date        TEXT,
@@ -105,6 +109,15 @@ async def get_free_tarot_used(user_id: int, date: str) -> bool:
         ) as cur:
             row = await cur.fetchone()
     return bool(row and row[0] == date)
+
+
+async def increment_readings(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET readings_count = readings_count + 1 WHERE user_id = ?",
+            (user_id,)
+        )
+        await db.commit()
 
 
 async def mark_free_tarot_used(user_id: int, date: str):

@@ -6,7 +6,10 @@ from datetime import datetime, timezone
 
 import database as db
 from config import TAROT_SUB_STARS, PRIVATE_READING_STARS
-from keyboards.inline import main_menu_kb, subscribe_daily_tarot_kb, pay_private_reading_kb, ZODIAC_SIGNS
+from keyboards.inline import (
+    main_menu_kb, subscribe_daily_tarot_kb, pay_private_reading_kb,
+    private_reading_free_kb, cancel_kb, ZODIAC_SIGNS
+)
 from services.ai_service import generate_daily_tarot, generate_private_tarot
 
 router = Router()
@@ -16,6 +19,33 @@ class TarotState(StatesGroup):
     waiting_for_birth_date = State()
     waiting_for_private_situation = State()
     waiting_for_private_situation_paid = State()
+
+
+def get_level(readings: int) -> str:
+    if readings == 0:
+        return "🌱 Новичок"
+    elif readings <= 3:
+        return "⭐ Начинающий астролог"
+    elif readings <= 10:
+        return "🌙 Искатель знаний"
+    elif readings <= 25:
+        return "🔮 Практикующий таролог"
+    elif readings <= 50:
+        return "🌟 Опытный таролог"
+    elif readings <= 100:
+        return "🪄 Мастер Таро"
+    else:
+        return "👑 Великий Оракул"
+
+
+def get_next_level_info(readings: int) -> str:
+    thresholds = [(3, "Начинающий астролог"), (10, "Искатель знаний"),
+                  (25, "Практикующий таролог"), (50, "Опытный таролог"),
+                  (100, "Мастер Таро")]
+    for threshold, name in thresholds:
+        if readings < threshold:
+            return f"{threshold - readings} раскладов до уровня «{name}»"
+    return "Максимальный уровень достигнут ✨"
 
 
 # ── Таро на день (подписка) ───────────────────────────────────
@@ -29,9 +59,8 @@ async def daily_tarot_start(call: CallbackQuery, state: FSMContext):
         await call.message.edit_text(
             "📅 <b>Таро на день</b>\n\n"
             "Каждый день — персональный расклад из 3 карт на основе твоего знака "
-            "и даты рождения. Один раз в день, остаётся неизменным.\n\n"
-            f"⭐ Подписка: <b>{TAROT_SUB_STARS} звёзд / месяц</b>\n"
-            f"🎴 Или попробуй приватный расклад — первый <b>бесплатно</b>:",
+            "и даты рождения. Генерируется один раз, остаётся неизменным.\n\n"
+            f"⭐ Подписка: <b>{TAROT_SUB_STARS} звёзд / месяц</b>",
             parse_mode="HTML",
             reply_markup=subscribe_daily_tarot_kb(TAROT_SUB_STARS)
         )
@@ -45,7 +74,8 @@ async def daily_tarot_start(call: CallbackQuery, state: FSMContext):
             "Для персонального расклада нужна дата рождения.\n\n"
             "✏️ Введи в формате <b>ДД.ММ.ГГГГ</b>\n"
             "Например: <code>15.03.1995</code>",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=cancel_kb("cancel_fsm")
         )
         return
 
@@ -61,7 +91,8 @@ async def set_birth_date(message: Message, state: FSMContext):
         await message.answer(
             "⚠️ Неверный формат.\n\n"
             "Введи дату как <code>ДД.ММ.ГГГГ</code>, например: <code>15.03.1995</code>",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=cancel_kb("cancel_fsm")
         )
         return
 
@@ -106,6 +137,7 @@ async def _generate_and_show_daily(msg, user_id: int, zodiac_name: str, zodiac_e
         text, usage = await generate_daily_tarot(zodiac_name, birth_date, today)
         await db.save_daily_tarot(user_id, today, text)
         await db.add_token_usage(usage["input_tokens"], usage["output_tokens"], is_free=False)
+        await db.increment_readings(user_id)
     except Exception:
         await msg.edit_text("⚠️ Ошибка. Попробуй позже.", reply_markup=main_menu_kb())
         return
@@ -120,33 +152,41 @@ async def _generate_and_show_daily(msg, user_id: int, zodiac_name: str, zodiac_e
 # ── Приватный расклад ─────────────────────────────────────────
 
 @router.callback_query(F.data == "private_reading_start")
-async def private_reading_start(call: CallbackQuery, state: FSMContext):
+async def private_reading_start(call: CallbackQuery):
     today = datetime.now(timezone.utc).date().isoformat()
     free_used = await db.get_free_tarot_used(call.from_user.id, today)
 
     if not free_used:
-        await state.set_state(TarotState.waiting_for_private_situation)
         await call.message.edit_text(
             "🎴 <b>Приватный расклад</b>\n\n"
-            "🎁 У тебя есть <b>1 бесплатный расклад</b> сегодня!\n\n"
-            "Расскажи свою ситуацию или задай вопрос.\n"
-            "Чем подробнее — тем точнее расклад:",
-            parse_mode="HTML"
+            "🎁 Сегодня у тебя есть <b>бесплатный расклад</b>!\n\n"
+            "Получишь глубокий анализ своей ситуации:\n"
+            "🌑 Прошлое  •  🌕 Настоящее  •  🌟 Будущее  •  💫 Совет",
+            parse_mode="HTML",
+            reply_markup=private_reading_free_kb()
         )
     else:
         await call.message.edit_text(
             "🎴 <b>Приватный расклад</b>\n\n"
-            "Глубокий анализ твоей ситуации по методу\n"
-            "«Прошлое — Настоящее — Будущее».\n\n"
-            "🌑 Прошлое — что привело к этому\n"
-            "🌕 Настоящее — что происходит сейчас\n"
-            "🌟 Будущее — к чему это ведёт\n"
-            "💫 Совет карт — что делать\n\n"
-            f"💳 Стоимость: <b>{PRIVATE_READING_STARS} звёзд</b>\n"
-            f"🆓 Бесплатный расклад — уже использован сегодня",
+            "Глубокий анализ твоей ситуации:\n"
+            "🌑 Прошлое  •  🌕 Настоящее  •  🌟 Будущее  •  💫 Совет\n\n"
+            "🆓 Бесплатный расклад сегодня уже использован\n"
+            f"💳 Стоимость: <b>{PRIVATE_READING_STARS} звёзд</b>",
             parse_mode="HTML",
             reply_markup=pay_private_reading_kb(PRIVATE_READING_STARS)
         )
+
+
+@router.callback_query(F.data == "use_free_tarot")
+async def use_free_tarot(call: CallbackQuery, state: FSMContext):
+    await state.set_state(TarotState.waiting_for_private_situation)
+    await call.message.edit_text(
+        "🎴 <b>Приватный расклад</b>  🎁 бесплатный\n\n"
+        "Расскажи свою ситуацию или задай вопрос.\n"
+        "Чем подробнее — тем точнее расклад:",
+        parse_mode="HTML",
+        reply_markup=cancel_kb("cancel_fsm")
+    )
 
 
 @router.message(TarotState.waiting_for_private_situation)
@@ -164,6 +204,7 @@ async def private_situation_free(message: Message, state: FSMContext):
     try:
         text, usage = await generate_private_tarot(situation, user_messages)
         await db.add_token_usage(usage["input_tokens"], usage["output_tokens"], is_free=True)
+        await db.increment_readings(message.from_user.id)
     except Exception:
         await thinking.edit_text("⚠️ Ошибка. Попробуй ещё раз.", reply_markup=main_menu_kb())
         return
@@ -188,6 +229,7 @@ async def private_situation_paid(message: Message, state: FSMContext):
     try:
         text, usage = await generate_private_tarot(situation, user_messages)
         await db.add_token_usage(usage["input_tokens"], usage["output_tokens"], is_free=False)
+        await db.increment_readings(message.from_user.id)
     except Exception:
         await thinking.edit_text("⚠️ Ошибка. Попробуй ещё раз.", reply_markup=main_menu_kb())
         return
@@ -195,6 +237,17 @@ async def private_situation_paid(message: Message, state: FSMContext):
     await thinking.edit_text(
         f"🎴 <b>Приватный расклад</b>\n\n{text}",
         parse_mode="HTML",
+        reply_markup=main_menu_kb()
+    )
+
+
+# ── Отмена FSM ────────────────────────────────────────────────
+
+@router.callback_query(F.data == "cancel_fsm")
+async def cancel_fsm(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await call.message.edit_text(
+        "Главное меню — выбери действие:",
         reply_markup=main_menu_kb()
     )
 

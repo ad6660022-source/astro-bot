@@ -16,12 +16,24 @@ class SupportForm(StatesGroup):
 
 @router.callback_query(F.data == "support")
 async def support_start(call: CallbackQuery, state: FSMContext):
+    from keyboards.inline import cancel_kb
     await state.set_state(SupportForm.waiting_for_message)
     await call.message.edit_text(
         "🆘 <b>Поддержка</b>\n\n"
         "Опиши свою проблему или задай вопрос.\n"
         "Мы ответим в ближайшее время:",
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=cancel_kb("cancel_support")
+    )
+
+
+@router.callback_query(F.data == "cancel_support")
+async def cancel_support(call: CallbackQuery, state: FSMContext):
+    from keyboards.inline import main_menu_kb
+    await state.clear()
+    await call.message.edit_text(
+        "Главное меню — выбери действие:",
+        reply_markup=main_menu_kb()
     )
 
 
