@@ -166,7 +166,7 @@ async def admin_stats(call: CallbackQuery):
         f"📊 <b>Статистика AstroBot</b>\n\n"
         f"👥 Всего пользователей: <b>{stats['total']}</b>\n"
         f"💳 Активных подписок: <b>{stats['active_subs']}</b>\n"
-        f"💰 Доход в месяц: ~<b>{stats['active_subs'] * 175} руб</b>\n"
+        f"💰 Доход в месяц: ~<b>{stats['active_subs'] * 136} руб</b>\n"
         f"🔮 Гороскопов сгенерировано: <b>{stats['horoscopes']}</b>\n"
         f"📅 Раскладов «на день»: <b>{stats.get('daily_tarots', 0)}</b>\n"
         f"🆘 Открытых тикетов: <b>{len(open_tickets)}</b>",
